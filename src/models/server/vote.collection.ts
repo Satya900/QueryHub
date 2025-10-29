@@ -37,19 +37,19 @@ export default async function createVoteCollection(){
                 required: true
                         }),
             tablesDB.createEnumColumn({
-                            databaseId: db,
-                            tableId: voteCollection,
-                            key: "voteStatus",
-                            elements: ["upvote", "downvote"],
-                            required: true
+                databaseId: db,
+                tableId: voteCollection,
+                key: "voteStatus",
+                elements: ["upvote", "downvote"],
+                required: true
                         }),
 
             tablesDB.createStringColumn({
-                            databaseId: db,
-                            tableId: voteCollection,
-                            key: "voteById",
-                            size: 50,
-                            required: true
+                databaseId: db,
+                tableId: voteCollection,
+                key: "voteById",
+                size: 50,
+                required: true
                         })
         ]);
         console.log("Vote Attributes Created");
