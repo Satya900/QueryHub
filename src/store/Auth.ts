@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { create } from "zustand";
 import {immer} from "zustand/middleware/immer"
 import { persist } from "zustand/middleware"
