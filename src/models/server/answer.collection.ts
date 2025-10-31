@@ -44,6 +44,13 @@ export default async function createAnswerCollection(){
                             size: 255,
                             required: true
                         }),
+            tablesDB.createStringColumn({
+                            databaseId: db,
+                            tableId: answerCollection,
+                            key: "imageUrl",
+                            size: 500,
+                            required: false
+                        }),
         ]);
         console.log("Answer Attributes Created");
 

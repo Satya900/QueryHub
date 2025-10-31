@@ -8,14 +8,15 @@ import getOrCreateQuestionAttachmentBucket from './models/server/storage.collect
  
 // This function can be marked `async` if using `await` inside
 export async function middleware(request: NextRequest) {
-
-  await Promise.all([
-    dbSetup(),
-    getOrCreateQuestionAttachmentBucket(),
-  ])
-
-
-
+  try {
+    await Promise.all([
+      dbSetup(),
+      getOrCreateQuestionAttachmentBucket(),
+    ]);
+  } catch (error) {
+    console.error('Middleware setup failed:', error);
+    // Continue processing the request even if setup fails
+  }
 
   return NextResponse.next();
 }

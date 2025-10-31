@@ -2,6 +2,7 @@
 
 "use client"
 import { useAuthStore } from "@/store/Auth";
+import { useRouter } from "next/navigation";
 import React from "react"
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ const LabelInputContainer = ({
 
 const RegisterPage = () => {
     const {createAccount, login} = useAuthStore();
+    const router = useRouter();
     const [isLoading, setIsLoading] = React.useState(false);
     const [error, setError] = React.useState("");
 
@@ -66,6 +68,10 @@ const RegisterPage = () => {
            const loginResponse = await login(email, password)
               if(loginResponse.error){
                 setError(loginResponse.error.message)
+              } else if (loginResponse.profileUrl) {
+                router.push(loginResponse.profileUrl);
+              } else {
+                router.push("/questions");
               }
         }
 

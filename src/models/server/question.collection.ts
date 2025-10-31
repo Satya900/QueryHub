@@ -58,6 +58,13 @@ export default async function createQuestionCollection() {
         size: 255,
         required: false,
       }),
+      tablesDB.createStringColumn({
+        databaseId: db,
+        tableId: questionCollection,
+        key: "imageUrl",
+        size: 500,
+        required: false,
+      }),
     ])
 
     console.log("✅ Columns created successfully");

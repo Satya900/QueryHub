@@ -1,130 +1,127 @@
-import { voteCollection, db, questionCollection, answerCollection } from "@/models/name";
-import { client, user} from "@/models/server/config";
-import { UserPrefs } from "@/store/Auth";
+import { voteCollection, db } from "@/models/name";
+import { user, client } from "@/models/server/config";
 import { NextRequest, NextResponse } from "next/server";
-import { ID, Query, TablesDB } from "node-appwrite";
+import { ID, TablesDB, Query } from "node-appwrite";
+
 const tablesDB = new TablesDB(client);
 
-export async function POST(request: NextRequest){
+export async function POST(request: NextRequest) {
     try {
-        // Extract vote data from request
-        const { voteById, voteStatus, type, typeId} = await request.json();
+        const { typeId, type, voteType, authorId } = await request.json();
         
-        // Check if user has already voted on this item
+        // Check if user already voted on this item
         const existingVote = await tablesDB.listRows({
             databaseId: db,
             tableId: voteCollection,
-            queries:[
-                Query.equal("type", type),
+            queries: [
                 Query.equal("typeId", typeId),
-                Query.equal("voteById", voteById)
+                Query.equal("type", type),
+                Query.equal("voteById", authorId),
             ]
-        })
+        });
+
+        let userVote = null;
         
-        // If user has previously voted, remove the old vote and revert reputation
-        if(existingVote.rows.length > 0){
-            // Delete existing vote
-            await tablesDB.deleteRow({
-                databaseId: db,
-                tableId: voteCollection,
-                rowId: existingVote.rows[0].$id
-            })
+        if (existingVote.total > 0) {
+            const currentVote = existingVote.rows[0];
             
-            // Get the question/answer author to update their reputation
-            const targetItem = await tablesDB.getRow({
-                databaseId: db,
-                tableId: type === "question" ? questionCollection : answerCollection,
-                rowId: typeId
-            })
-
-            const authorPrefs = await user.getPrefs<UserPrefs>({
-                userId: targetItem.authorId
-            })
-
-            // Revert reputation change from previous vote
-            await user.updatePrefs<UserPrefs>({
-                userId: targetItem.authorId,
-                prefs: {
-                    reputation: existingVote.rows[0].voteStatus === "upvoted"
-                        ? authorPrefs.reputation - 1  // Remove upvote bonus
-                        : authorPrefs.reputation + 1   // Remove downvote penalty
-                }
-            })
-        }
-        
-        // Create new vote if vote status is different from existing or no previous vote
-        if(existingVote.rows[0]?.voteStatus != voteStatus){
-            // Create new vote record
+            // If clicking the same vote type, remove the vote (toggle off)
+            if (currentVote.voteStatus === voteType) {
+                await tablesDB.deleteRow({
+                    databaseId: db,
+                    tableId: voteCollection,
+                    rowId: currentVote.$id
+                });
+                userVote = null;
+            } else {
+                // If clicking different vote type, update the vote
+                await tablesDB.updateRow({
+                    databaseId: db,
+                    tableId: voteCollection,
+                    rowId: currentVote.$id,
+                    data: { voteStatus: voteType }
+                });
+                userVote = voteType;
+            }
+        } else {
+            // Create new vote
             await tablesDB.createRow({
                 databaseId: db,
                 tableId: voteCollection,
                 rowId: ID.unique(),
                 data: {
-                    type,
                     typeId,
-                    voteById,
-                    voteStatus
+                    type,
+                    voteStatus: voteType,
+                    voteById: authorId
                 }
             });
-            
-            // Update author's reputation based on new vote
-            const targetItem = await tablesDB.getRow({
-                databaseId: db,
-                tableId: type === "question" ? questionCollection : answerCollection,
-                rowId: typeId
-            })
-            
-            const authorPrefs = await user.getPrefs<UserPrefs>({
-                userId: targetItem.authorId
-            })
-
-            // Apply reputation change for new vote
-            await user.updatePrefs<UserPrefs>({
-                userId: targetItem.authorId,
-                prefs:{
-                    reputation: 
-                        voteStatus === "upvoted"
-                        ? authorPrefs.reputation + 1  // Add upvote bonus
-                        : authorPrefs.reputation - 1   // Add downvote penalty
-                }
-            });
+            userVote = voteType;
         }
 
-        // Get current vote counts for this item
-        const [upVotes, downVotes] = await Promise.all([
+        // Calculate new score
+        const [upvotes, downvotes] = await Promise.all([
             tablesDB.listRows({
                 databaseId: db,
                 tableId: voteCollection,
-                queries:[
-                    Query.equal("type", type),
+                queries: [
                     Query.equal("typeId", typeId),
-                    Query.equal("voteStatus", "upvoted")
+                    Query.equal("type", type),
+                    Query.equal("voteStatus", "upvote"),
                 ]
             }),
             tablesDB.listRows({
                 databaseId: db,
                 tableId: voteCollection,
-                queries:[
-                    Query.equal("type", type),
+                queries: [
                     Query.equal("typeId", typeId),
-                    Query.equal("voteStatus", "downvoted")
+                    Query.equal("type", type),
+                    Query.equal("voteStatus", "downvote"),
                 ]
-            }),
-        ]) 
+            })
+        ]);
 
-        return NextResponse.json({
-            data:{
-                vote: existingVote.rows[0] || null,
-                voteResult:{
-                    upVotes: upVotes.total,
-                    downVotes: downVotes.total
-                }
-            }
-        }, { status: 201 })
+        const newScore = upvotes.total - downvotes.total;
+        
+        return NextResponse.json({ 
+            newScore, 
+            userVote,
+            upvotes: upvotes.total,
+            downvotes: downvotes.total
+        }, { status: 200 });
 
     } catch (error) {
-        return NextResponse.json({
-            error
-        }, {status:500})
+        return NextResponse.json({ error }, { status: 500 });
+    }
+}
+
+export async function GET(request: NextRequest) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const typeId = searchParams.get('typeId');
+        const type = searchParams.get('type');
+        const userId = searchParams.get('userId');
+
+        if (!typeId || !type || !userId) {
+            return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+        }
+
+        // Get user's current vote
+        const userVote = await tablesDB.listRows({
+            databaseId: db,
+            tableId: voteCollection,
+            queries: [
+                Query.equal("typeId", typeId),
+                Query.equal("type", type),
+                Query.equal("voteById", userId),
+            ]
+        });
+
+        return NextResponse.json({ 
+            userVote: userVote.total > 0 ? userVote.rows[0].voteStatus : null 
+        }, { status: 200 });
+
+    } catch (error) {
+        return NextResponse.json({ error }, { status: 500 });
     }
 }

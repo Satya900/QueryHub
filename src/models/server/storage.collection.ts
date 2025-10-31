@@ -10,6 +10,27 @@ export default async function getOrCreateQuestionAttachmentBucket(){
     try {
         await storage.getBucket({ bucketId: questionAttachmentBucket })
         console.log("storage connected");
+        
+        // Update bucket with correct extensions
+        try {
+            await storage.updateBucket({
+                bucketId: questionAttachmentBucket,
+                name: "Question Attachments",
+                permissions: [
+                    Permission.create("users"),
+                    Permission.read("any"),
+                    Permission.read("users"),
+                    Permission.update("users"),
+                    Permission.delete("users"),
+                ],
+                fileSecurity: false,
+                maximumFileSize: 10485760,
+                allowedFileExtensions: [],
+            })
+            console.log("Storage Updated");
+        } catch (updateError) {
+            console.log("error updating bucket", updateError);
+        }
     } catch (error) {
         try {
             await storage.createBucket({
@@ -24,7 +45,7 @@ export default async function getOrCreateQuestionAttachmentBucket(){
                 ],
                 fileSecurity: false,
                 maximumFileSize: 10485760, // 10 MB
-                allowedFileExtensions:[".png", ".jpg", ".jpeg", ".gif", ".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".txt", ".zip", ".rar"],  
+                allowedFileExtensions: [],  
 
             })
 

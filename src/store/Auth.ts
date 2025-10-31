@@ -4,6 +4,7 @@ import { persist } from "zustand/middleware"
 
 import { AppwriteException, ID, Models  } from "appwrite"
 import { account } from "@/models/client/config";
+import { generateProfileUrl } from "@/utils/profileUrl";
 
 export interface UserPrefs {
     reputation: number
@@ -23,7 +24,8 @@ interface IAuthStore {
     ): Promise<
     {
         success: boolean;
-        error? : AppwriteException | null
+        error? : AppwriteException | null;
+        profileUrl?: string | null;
     }>;
 
     createAccount(
@@ -37,6 +39,7 @@ interface IAuthStore {
     }
     >;
     logout(): Promise<void>;
+    redirectToProfile(): string | null;
 
 }
 
@@ -83,7 +86,14 @@ export const useAuthStore = create<IAuthStore>()(
                         })
                     }
                     set({ session, user, jwt })
-                    return { success: true }
+                    
+                    try {
+                        const profileUrl = generateProfileUrl(user.$id, user.name);
+                        return { success: true, profileUrl };
+                    } catch (profileError) {
+                        console.error('Profile URL generation failed:', profileError);
+                        return { success: true, profileUrl: null };
+                    }
                 } catch (error) {
                     return { success: false, error: error as AppwriteException }
                 }
@@ -109,6 +119,17 @@ export const useAuthStore = create<IAuthStore>()(
                     set({ session: null, user: null, jwt: null })
                 } catch (error) {
                     console.error('Logout error:', error)
+                }
+            },
+
+            redirectToProfile() {
+                try {
+                    const currentUser = this.user;
+                    if (!currentUser) return null;
+                    return generateProfileUrl(currentUser.$id, currentUser.name);
+                } catch (error) {
+                    console.error('Profile URL generation error:', error);
+                    return null;
                 }
             }
         })),

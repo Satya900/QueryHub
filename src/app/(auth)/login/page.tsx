@@ -1,6 +1,7 @@
 "use client"
 
 import { useAuthStore } from "@/store/Auth";
+import { useRouter } from "next/navigation";
 import React from "react"
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,7 @@ const LabelInputContainer = ({
 
 const LoginPage = () => {
     const {login} = useAuthStore();
+    const router = useRouter();
     const [isLoading, setIsLoading] = React.useState(false);
     const [error, setError] = React.useState("");
 
@@ -53,6 +55,10 @@ const LoginPage = () => {
     const loginResponse = await login(email, password)
     if(loginResponse.error){
         setError(loginResponse.error.message)
+    } else if (loginResponse.profileUrl) {
+        router.push(loginResponse.profileUrl);
+    } else {
+        router.push("/questions");
     }
     setIsLoading(false);
 
@@ -77,7 +83,7 @@ const LoginPage = () => {
           <LabelInputContainer className="mb-4">
                     <Label htmlFor="email">Email Address</Label>
                     <Input
-                    className="text-black"
+                    className="text-white"
                         id="email"
                         name="email"
                         placeholder="projectmayhem@fc.com"
@@ -86,7 +92,7 @@ const LoginPage = () => {
           </LabelInputContainer>
           <LabelInputContainer className="mb-4">
                     <Label htmlFor="password">Password</Label>
-                    <Input className="text-black" id="password" name="password" placeholder="••••••••" type="password" />
+                    <Input className="text-white" id="password" name="password" placeholder="••••••••" type="password" />
           </LabelInputContainer>
 
           <button
